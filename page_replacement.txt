@@ -1,1 +1,27 @@
 Page Replacement module implementation details go here.
+# Page Replacement Module
+
+# Overview
+This module demonstrates different page replacement algorithms used in operating systems for efficient memory management. It helps visualize how pages are replaced when a page fault occurs.
+
+# Page Replacement Algorithms Implemented
+1. FIFO (First-In-First-Out)
+   - The oldest page in memory is replaced first.
+   - Simple but can lead to high page faults in some cases.
+
+2. LRU (Least Recently Used)  
+   - Replaces the page that has not been used for the longest time.
+   - More efficient but requires additional tracking.
+
+3. Optimal Page Replacement  
+   - Replaces the page that will not be used for the longest time in the future.
+   - Theoretically optimal but requires future knowledge.
+
+# Implementation Details
+- The program simulates a process requesting pages from memory.
+- Tracks page faults and replacements in real-time.
+- The visualization module interacts with this to show how pages are replaced dynamically.
+
+# Input and Output
+- Input: A sequence of page requests from a process.
+- Output: Visualization of page faults and replacements.
