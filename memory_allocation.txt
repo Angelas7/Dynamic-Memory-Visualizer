@@ -1,1 +1,19 @@
 This file contains memory allocation implementation details.
+# Memory Allocation Module
+
+# Overview
+This module implements dynamic memory allocation techniques used in operating systems. It helps visualize how memory blocks are allocated and deallocated during runtime.
+
+# Allocation Strategies
+1. First Fit - Allocates the first block that is large enough.
+2. Best Fit - Allocates the smallest available block that fits.
+3. Worst Fit - Allocates the largest available block to leave maximum free space.
+
+# Implementation Details
+- The program simulates a memory block and processes requesting memory.
+- It shows how memory gets fragmented and deallocated.
+- The visualization module interacts with this to display memory allocation dynamically.
+
+# Input and Output
+- Input: Process memory requests with size requirements.
+- Output: Allocated memory blocks and free space visualization.
