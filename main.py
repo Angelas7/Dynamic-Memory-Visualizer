@@ -46,6 +46,7 @@ class MemoryVisualizer(QMainWindow):
                 self.memory_table.setItem(0, i, item)
 
         except ValueError as e:
+            
             QMessageBox.warning(self, "Input Error", f"Invalid input: {str(e)}")
 
 
