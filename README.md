@@ -16,5 +16,5 @@ git clone https://github.com/Angelas7/Dynamic-Memory-Visualizer.git
 
 ##  Contributors  
 -Angela
--Armaan Khan  
+-Arman Khan  
 -Rakshit Prinja  
