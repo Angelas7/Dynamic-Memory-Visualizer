@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dynamic Memory Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #08090d;
+  --surface: #0e1118;
+  --surface2: #131624;
+  --border: #1e2230;
+  --accent: #00ffe0;
+  --accent2: #7b61ff;
+  --accent3: #ff6b6b;
+  --gold: #ffd000;
+  --hit-bg: rgba(0,255,224,0.08);
+  --hit-fg: #00ffe0;
+  --miss-bg: rgba(255,107,107,0.08);
+  --miss-fg: #ff6b6b;
+  --text: #e8eaf6;
+  --muted: #6b7080;
+  --mono: 'Space Mono', monospace;
+  --display: 'Syne', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(to bottom,transparent 0,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px);pointer-events:none;z-index:9999;}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:200;background:rgba(8,9,13,0.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:stretch;gap:0;}
+.nav-logo{font-family:var(--display);font-weight:800;font-size:0.95rem;color:var(--accent);letter-spacing:0.06em;padding:1rem 1.5rem 1rem 0;border-right:1px solid var(--border);margin-right:0.5rem;display:flex;align-items:center;}
+.tab-btn{background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;padding:0 1.2rem;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;position:relative;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.nav-badge{display:inline-block;font-size:0.5rem;background:var(--accent2);color:#000;padding:1px 5px;border-radius:2px;margin-left:5px;vertical-align:middle;font-weight:700;}
+
+/* LAYOUT */
+.app-body{max-width:1300px;margin:0 auto;padding:2.5rem 2rem;}
+.panel{display:none;}
+.panel.active{display:block;}
+
+/* SECTION HEADERS */
+.panel-header{margin-bottom:2rem;}
+.panel-tag{font-size:0.62rem;letter-spacing:0.2em;color:var(--accent);text-transform:uppercase;margin-bottom:0.5rem;}
+.panel-title{font-family:var(--display);font-size:1.8rem;font-weight:800;letter-spacing:-0.02em;line-height:1.1;}
+.panel-desc{margin-top:0.5rem;font-size:0.75rem;color:var(--muted);line-height:1.8;}
+
+/* INPUT ROW */
+.input-row{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:2rem;}
+.field{display:flex;flex-direction:column;gap:0.4rem;}
+.field label{font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:0.8rem;padding:0.65rem 0.9rem;width:180px;outline:none;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent);}
+.field input.wide{width:340px;}
+
+.btn{display:inline-flex;align-items:center;gap:0.5rem;padding:0.65rem 1.5rem;font-family:var(--mono);font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;border:none;cursor:pointer;transition:all .2s;}
+.btn-run{background:var(--accent);color:#000;font-weight:700;}
+.btn-run:hover{background:#fff;transform:translate(-2px,-2px);box-shadow:3px 3px 0 var(--accent);}
+.btn-gen{background:transparent;color:var(--text);border:1px solid var(--border);}
+.btn-gen:hover{border-color:var(--accent2);color:var(--accent2);transform:translate(-2px,-2px);box-shadow:3px 3px 0 rgba(123,97,255,.2);}
+.btn-clear{background:transparent;color:var(--muted);border:1px solid var(--border);font-size:0.65rem;}
+.btn-clear:hover{border-color:var(--accent3);color:var(--accent3);}
+
+/* TABLES */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);}
+table{border-collapse:collapse;width:100%;min-width:400px;}
+th{background:var(--surface2);font-size:0.62rem;letter-spacing:0.1em;color:var(--muted);padding:0.5rem 0.7rem;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:0.55rem 0.7rem;text-align:center;font-size:0.75rem;border-right:1px solid var(--border);border-bottom:1px solid var(--border);transition:background .3s;}
+tr:last-child td{border-bottom:none;}
+td:last-child,th:last-child{border-right:none;}
+.row-header{font-size:0.6rem;letter-spacing:0.1em;color:var(--muted);background:var(--surface2);text-align:left;padding-left:0.9rem;white-space:nowrap;}
+
+/* Paging / segmentation cells */
+.cell-page{background:rgba(0,255,224,0.06);color:var(--accent);font-weight:700;}
+.cell-seg-code{background:rgba(0,255,224,0.06);color:var(--accent);}
+.cell-seg-data{background:rgba(123,97,255,0.07);color:var(--accent2);}
+.cell-seg-stack{background:rgba(255,107,107,0.07);color:var(--accent3);}
+.cell-swap{background:rgba(255,107,107,0.1);color:var(--accent3);font-weight:700;}
+
+/* Hit / Miss */
+.cell-hit{background:var(--hit-bg)!important;color:var(--hit-fg)!important;font-weight:700;}
+.cell-miss{background:var(--miss-bg)!important;color:var(--miss-fg)!important;font-weight:700;}
+
+/* Stats bar */
+.stats-bar{display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:1.5rem;}
+.stat-pill{background:var(--surface2);border:1px solid var(--border);padding:0.6rem 1.2rem;display:flex;flex-direction:column;gap:0.2rem;}
+.stat-pill-val{font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--accent);}
+.stat-pill-val.red{color:var(--accent3);}
+.stat-pill-val.purple{color:var(--accent2);}
+.stat-pill-label{font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+
+/* Toast */
+.toast{position:fixed;bottom:2rem;right:2rem;z-index:9998;background:var(--surface2);border:1px solid var(--accent3);color:var(--accent3);font-family:var(--mono);font-size:0.72rem;padding:0.8rem 1.2rem;transform:translateY(100px);opacity:0;transition:all .3s;max-width:320px;}
+.toast.show{transform:translateY(0);opacity:1;}
+
+/* Empty state */
+.empty{padding:4rem 2rem;text-align:center;color:var(--muted);font-size:0.75rem;border:1px dashed var(--border);}
+.empty-icon{font-size:2.5rem;display:block;margin-bottom:1rem;opacity:.4;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);}
+
+/* ALGO switcher inside a panel */
+.sub-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:2rem;}
+.sub-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--mono);font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.7rem 1.2rem;cursor:pointer;transition:all .2s;margin-bottom:-1px;}
+.sub-tab:hover{color:var(--text);}
+.sub-tab.active{color:var(--accent2);border-bottom-color:var(--accent2);}
+.sub-panel{display:none;}
+.sub-panel.active{display:block;}
+
+/* Virtual memory visual */
+.vm-legend{display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:1rem;}
+.legend-item{display:flex;align-items:center;gap:0.4rem;font-size:0.62rem;color:var(--muted);}
+.legend-dot{width:10px;height:10px;border-radius:1px;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">MemViz</div>
+  <button class="tab-btn active" data-tab="paging">Paging</button>
+  <button class="tab-btn" data-tab="segmentation">Segmentation</button>
+  <button class="tab-btn" data-tab="virtual">Virtual Memory</button>
+  <button class="tab-btn" data-tab="algorithms">Algorithms <span class="nav-badge">FIFO · LRU</span></button>
+</nav>
+
+<div class="app-body">
+
+  <!-- ═══ PAGING ═══ -->
+  <div class="panel active" id="panel-paging">
+    <div class="panel-header">
+      <div class="panel-tag">// simulation 01</div>
+      <div class="panel-title">Paging</div>
+      <div class="panel-desc">Divides physical memory into fixed-size pages. Enter total memory size and page size (in KB).</div>
+    </div>
+    <div class="input-row">
+      <div class="field">
+        <label>Memory Size (KB)</label>
+        <input type="number" id="paging-mem" placeholder="e.g. 1024" min="1"/>
+      </div>
+      <div class="field">
+        <label>Page Size (KB)</label>
+        <input type="number" id="paging-page" placeholder="e.g. 64" min="1"/>
+      </div>
+      <button class="btn btn-run" onclick="runPaging()">▶ Simulate</button>
+      <button class="btn btn-clear" onclick="clearPanel('paging')">✕ Clear</button>
+    </div>
+    <div id="paging-out"><div class="empty"><span class="empty-icon">📄</span>Enter memory and page size, then click Simulate.</div></div>
+  </div>
+
+  <!-- ═══ SEGMENTATION ═══ -->
+  <div class="panel" id="panel-segmentation">
+    <div class="panel-header">
+      <div class="panel-tag">// simulation 02</div>
+      <div class="panel-title">Segmentation</div>
+      <div class="panel-desc">Divides memory into variable-size segments: Code (40%), Data (30%), Stack (30%).</div>
+    </div>
+    <div class="input-row">
+      <div class="field">
+        <label>Memory Size (KB)</label>
+        <input type="number" id="seg-mem" placeholder="e.g. 1024" min="1"/>
+      </div>
+      <button class="btn btn-run" onclick="runSegmentation()">▶ Simulate</button>
+      <button class="btn btn-clear" onclick="clearPanel('segmentation')">✕ Clear</button>
+    </div>
+    <div id="seg-out"><div class="empty"><span class="empty-icon">🔍</span>Enter memory size, then click Simulate.</div></div>
+  </div>
+
+  <!-- ═══ VIRTUAL MEMORY ═══ -->
+  <div class="panel" id="panel-virtual">
+    <div class="panel-header">
+      <div class="panel-tag">// simulation 03</div>
+      <div class="panel-title">Virtual Memory</div>
+      <div class="panel-desc">Shows page-to-frame mapping with one swapped-out page, illustrating the virtual memory abstraction.</div>
+    </div>
+    <div class="input-row">
+      <div class="field">
+        <label>Memory Size (KB)</label>
+        <input type="number" id="vm-mem" placeholder="e.g. 512" min="1"/>
+      </div>
+      <div class="field">
+        <label>Page Size (KB)</label>
+        <input type="number" id="vm-page" placeholder="e.g. 64" min="1"/>
+      </div>
+      <button class="btn btn-run" onclick="runVirtualMemory()">▶ Simulate</button>
+      <button class="btn btn-clear" onclick="clearPanel('virtual')">✕ Clear</button>
+    </div>
+    <div class="vm-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(0,255,224,.4)"></div>In Memory (RAM)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(255,107,107,.4)"></div>Swapped to Disk</div>
+    </div>
+    <div id="vm-out"><div class="empty"><span class="empty-icon">🔄</span>Enter memory and page size, then click Simulate.</div></div>
+  </div>
+
+  <!-- ═══ ALGORITHMS ═══ -->
+  <div class="panel" id="panel-algorithms">
+    <div class="panel-header">
+      <div class="panel-tag">// simulation 04 · 05</div>
+      <div class="panel-title">Page Replacement</div>
+      <div class="panel-desc">Run FIFO or LRU on a reference string. Generate a random string or enter your own (comma-separated integers).</div>
+    </div>
+    <div class="sub-tabs">
+      <button class="sub-tab active" data-sub="fifo">FIFO — First In First Out</button>
+      <button class="sub-tab" data-sub="lru">LRU — Least Recently Used</button>
+    </div>
+
+    <!-- FIFO -->
+    <div class="sub-panel active" id="sub-fifo">
+      <div class="input-row">
+        <div class="field">
+          <label>Reference String</label>
+          <input type="text" id="fifo-ref" class="wide" placeholder="e.g. 1,2,3,4,1,2,5,1,2,3"/>
+        </div>
+        <div class="field">
+          <label>Frame Count</label>
+          <input type="number" id="fifo-frames" placeholder="e.g. 3" min="1" style="width:120px"/>
+        </div>
+        <button class="btn btn-gen" onclick="generateRef('fifo-ref')">⚂ Random</button>
+        <button class="btn btn-run" onclick="runFIFO()">▶ Run FIFO</button>
+        <button class="btn btn-clear" onclick="clearAlgo('fifo')">✕ Clear</button>
+      </div>
+      <div id="fifo-out"><div class="empty"><span class="empty-icon">🕒</span>Generate or enter a reference string, then click Run FIFO.</div></div>
+      <div id="fifo-stats" class="stats-bar"></div>
+    </div>
+
+    <!-- LRU -->
+    <div class="sub-panel" id="sub-lru">
+      <div class="input-row">
+        <div class="field">
+          <label>Reference String</label>
+          <input type="text" id="lru-ref" class="wide" placeholder="e.g. 1,2,3,4,1,2,5,1,2,3"/>
+        </div>
+        <div class="field">
+          <label>Frame Count</label>
+          <input type="number" id="lru-frames" placeholder="e.g. 3" min="1" style="width:120px"/>
+        </div>
+        <button class="btn btn-gen" onclick="generateRef('lru-ref')">⚂ Random</button>
+        <button class="btn btn-run" onclick="runLRU()">▶ Run LRU</button>
+        <button class="btn btn-clear" onclick="clearAlgo('lru')">✕ Clear</button>
+      </div>
+      <div id="lru-out"><div class="empty"><span class="empty-icon">📉</span>Generate or enter a reference string, then click Run LRU.</div></div>
+      <div id="lru-stats" class="stats-bar"></div>
+    </div>
+  </div>
+
+</div><!-- /app-body -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── TAB NAVIGATION ──────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+document.querySelectorAll('.sub-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.sub-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('sub-' + btn.dataset.sub).classList.add('active');
+  });
+});
+
+// ── TOAST ────────────────────────────────────────────────────────
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = '⚠ ' + msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ── PAGING ───────────────────────────────────────────────────────
+function runPaging() {
+  const mem  = parseInt(document.getElementById('paging-mem').value);
+  const page = parseInt(document.getElementById('paging-page').value);
+  const out  = document.getElementById('paging-out');
+  if (!mem || !page || mem <= 0 || page <= 0) return toast('Memory size and page size must be positive integers.');
+  if (page > mem) return toast('Page size cannot exceed memory size.');
+  const numPages = Math.floor(mem / page);
+  if (numPages > 128) return toast('Too many pages to display. Try a larger page size.');
+
+  let th = '', td = '';
+  for (let i = 0; i < numPages; i++) {
+    th += `<th>Frame ${i}</th>`;
+    td += `<td class="cell-page">Page ${i}<br><span style="font-size:.55rem;color:var(--muted)">0x${(i*page).toString(16).padStart(4,'0').toUpperCase()}</span></td>`;
+  }
+  out.innerHTML = `<div class="table-wrap"><table><thead><tr>${th}</tr></thead><tbody><tr>${td}</tr></tbody></table></div>
+  <div class="stats-bar">
+    <div class="stat-pill"><div class="stat-pill-val">${numPages}</div><div class="stat-pill-label">Total Pages</div></div>
+    <div class="stat-pill"><div class="stat-pill-val">${page} KB</div><div class="stat-pill-label">Page Size</div></div>
+    <div class="stat-pill"><div class="stat-pill-val">${mem} KB</div><div class="stat-pill-label">Total Memory</div></div>
+    ${mem % page > 0 ? `<div class="stat-pill"><div class="stat-pill-val red">${mem % page} KB</div><div class="stat-pill-label">Fragmentation</div></div>` : ''}
+  </div>`;
+}
+
+// ── SEGMENTATION ─────────────────────────────────────────────────
+function runSegmentation() {
+  const mem = parseInt(document.getElementById('seg-mem').value);
+  const out = document.getElementById('seg-out');
+  if (!mem || mem <= 0) return toast('Enter a valid memory size.');
+  const segs = [
+    { name: 'Code',  size: Math.round(mem * 0.4), cls: 'cell-seg-code',  desc: 'Executable instructions' },
+    { name: 'Data',  size: Math.round(mem * 0.3), cls: 'cell-seg-data',  desc: 'Global & static variables' },
+    { name: 'Stack', size: Math.round(mem * 0.3), cls: 'cell-seg-stack', desc: 'Call stack & local vars' },
+  ];
+  let th = '', td = '';
+  segs.forEach(s => {
+    th += `<th>${s.name}<br><span style="font-size:.5rem;color:var(--muted)">${s.desc}</span></th>`;
+    td += `<td class="${s.cls}">${s.size} KB<br><span style="font-size:.55rem;opacity:.6">${(s.size/mem*100).toFixed(0)}%</span></td>`;
+  });
+  out.innerHTML = `<div class="table-wrap"><table><thead><tr>${th}</tr></thead><tbody><tr>${td}</tr></tbody></table></div>
+  <div class="stats-bar">
+    <div class="stat-pill"><div class="stat-pill-val">${mem} KB</div><div class="stat-pill-label">Total Memory</div></div>
+    <div class="stat-pill"><div class="stat-pill-val">${segs.length}</div><div class="stat-pill-label">Segments</div></div>
+    <div class="stat-pill"><div class="stat-pill-val purple">${Math.round(mem*0.4)} KB</div><div class="stat-pill-label">Code Segment</div></div>
+  </div>`;
+}
+
+// ── VIRTUAL MEMORY ────────────────────────────────────────────────
+function runVirtualMemory() {
+  const mem  = parseInt(document.getElementById('vm-mem').value);
+  const page = parseInt(document.getElementById('vm-page').value);
+  const out  = document.getElementById('vm-out');
+  if (!mem || !page || mem <= 0 || page <= 0) return toast('Enter valid memory and page size.');
+  if (page > mem) return toast('Page size cannot exceed memory size.');
+  const numPages = Math.floor(mem / page);
+  if (numPages > 128) return toast('Too many pages. Try a larger page size.');
+
+  let th = '', tdVirt = '', tdPhys = '', tdStatus = '';
+  for (let i = 0; i < numPages; i++) {
+    th += `<th>VP ${i}</th>`;
+    tdVirt += `<td class="cell-page">VPage ${i}</td>`;
+  }
+  // Add swapped page
+  th += `<th style="color:var(--accent3)">Swap</th>`;
+  tdVirt += `<td class="cell-swap">VPage ${numPages}</td>`;
+
+  // Physical: pages map 1:1 except swapped
+  for (let i = 0; i < numPages; i++) {
+    tdPhys += `<td class="cell-page">Frame ${i}<br><span style="font-size:.52rem;opacity:.5">0x${(i*page).toString(16).padStart(4,'0').toUpperCase()}</span></td>`;
+  }
+  tdPhys += `<td class="cell-swap">Disk ↓</td>`;
+
+  for (let i = 0; i < numPages; i++) {
+    tdStatus += `<td class="cell-hit">Present</td>`;
+  }
+  tdStatus += `<td class="cell-miss">Swapped</td>`;
+
+  out.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th class="row-header">Layer</th>${th}</tr></thead>
+    <tbody>
+      <tr><td class="row-header">Virtual Pages</td>${tdVirt}</tr>
+      <tr><td class="row-header">Physical Frames</td>${tdPhys}</tr>
+      <tr><td class="row-header">Status</td>${tdStatus}</tr>
+    </tbody></table></div>
+  <div class="stats-bar">
+    <div class="stat-pill"><div class="stat-pill-val">${numPages}</div><div class="stat-pill-label">Pages in RAM</div></div>
+    <div class="stat-pill"><div class="stat-pill-val red">1</div><div class="stat-pill-label">Swapped to Disk</div></div>
+    <div class="stat-pill"><div class="stat-pill-val">${page} KB</div><div class="stat-pill-label">Page Size</div></div>
+  </div>`;
+}
+
+// ── REFERENCE STRING GENERATOR ────────────────────────────────────
+function generateRef(inputId) {
+  const arr = Array.from({length: 20}, () => Math.floor(Math.random() * 10));
+  document.getElementById(inputId).value = arr.join(',');
+}
+
+// ── FIFO ALGORITHM ────────────────────────────────────────────────
+function fifoAlgorithm(refList, frameCount) {
+  const queue = [];
+  const table = [];
+  const statusList = [];
+  for (const page of refList) {
+    if (queue.includes(page)) {
+      statusList.push('Hit');
+    } else {
+      statusList.push('Miss');
+      if (queue.length < frameCount) {
+        queue.push(page);
+      } else {
+        queue.shift();
+        queue.push(page);
+      }
+    }
+    const snap = [...queue];
+    while (snap.length < frameCount) snap.push('');
+    table.push(snap);
+  }
+  return { table, statusList };
+}
+
+function runFIFO() {
+  const refStr = document.getElementById('fifo-ref').value.trim();
+  const framesStr = document.getElementById('fifo-frames').value.trim();
+  const out = document.getElementById('fifo-out');
+  const statsEl = document.getElementById('fifo-stats');
+  if (!refStr || !framesStr) return toast('Enter a reference string and frame count.');
+  const frameCount = parseInt(framesStr);
+  if (!frameCount || frameCount <= 0) return toast('Frame count must be a positive integer.');
+  const refList = refStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+  if (!refList.length) return toast('Reference string must contain integers separated by commas.');
+
+  const { table, statusList } = fifoAlgorithm(refList, frameCount);
+  renderAlgoTable('fifo-out', refList, table, frameCount, statusList);
+
+  const hits = statusList.filter(s => s === 'Hit').length;
+  const misses = statusList.length - hits;
+  statsEl.innerHTML = `
+    <div class="stat-pill"><div class="stat-pill-val">${statusList.length}</div><div class="stat-pill-label">References</div></div>
+    <div class="stat-pill"><div class="stat-pill-val">${hits}</div><div class="stat-pill-label">Page Hits</div></div>
+    <div class="stat-pill"><div class="stat-pill-val red">${misses}</div><div class="stat-pill-label">Page Faults</div></div>
+    <div class="stat-pill"><div class="stat-pill-val purple">${(hits/statusList.length*100).toFixed(1)}%</div><div class="stat-pill-label">Hit Ratio</div></div>
+    <div class="stat-pill"><div class="stat-pill-val">${frameCount}</div><div class="stat-pill-label">Frames</div></div>`;
+}
+
+// ── LRU ALGORITHM ─────────────────────────────────────────────────
+function lruAlgorithm(refList, frameCount) {
+  const frames = [];
+  const order = [];
+  const table = [];
+  const statusList = [];
+
+  for (const page of refList) {
+    if (frames.includes(page)) {
+      statusList.push('Hit');
+      order.splice(order.indexOf(page), 1);
+    } else {
+      statusList.push('Miss');
+      if (frames.length < frameCount) {
+        frames.push(page);
+      } else {
+        const lruPage = order.shift();
+        frames[frames.indexOf(lruPage)] = page;
+      }
+    }
+    order.push(page);
+    const snap = [...frames];
+    while (snap.length < frameCount) snap.push('');
+    table.push(snap);
+  }
+  return { table, statusList };
+}
+
+function runLRU() {
+  const refStr = document.getElementById('lru-ref').value.trim();
+  const framesStr = document.getElementById('lru-frames').value.trim();
+  const statsEl = document.getElementById('lru-stats');
+  if (!refStr || !framesStr) return toast('Enter a reference string and frame count.');
+  const frameCount = parseInt(framesStr);
+  if (!frameCount || frameCount <= 0) return toast('Frame count must be a positive integer.');
+  const refList = refStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+  if (!refList.length) return toast('Reference string must contain integers separated by commas.');
+
+  const { table, statusList } = lruAlgorithm(refList, frameCount);
+  renderAlgoTable('lru-out', refList, table, frameCount, statusList);
+
+  const hits = statusList.filter(s => s === 'Hit').length;
+  const misses = statusList.length - hits;
+  statsEl.innerHTML = `
+    <div class="stat-pill"><div class="stat-pill-val">${statusList.length}</div><div class="stat-pill-label">References</div></div>
+    <div class="stat-pill"><div class="stat-pill-val">${hits}</div><div class="stat-pill-label">Page Hits</div></div>
+    <div class="stat-pill"><div class="stat-pill-val red">${misses}</div><div class="stat-pill-label">Page Faults</div></div>
+    <div class="stat-pill"><div class="stat-pill-val purple">${(hits/statusList.length*100).toFixed(1)}%</div><div class="stat-pill-label">Hit Ratio</div></div>
+    <div class="stat-pill"><div class="stat-pill-val">${frameCount}</div><div class="stat-pill-label">Frames</div></div>`;
+}
+
+// ── SHARED TABLE RENDERER ─────────────────────────────────────────
+function renderAlgoTable(outId, refList, table, frameCount, statusList) {
+  const out = document.getElementById(outId);
+  let headers = '<th class="row-header">Step →</th>';
+  refList.forEach((p, i) => headers += `<th>${p}</th>`);
+
+  let rows = '';
+  for (let f = 0; f < frameCount; f++) {
+    rows += `<tr><td class="row-header">Frame ${f+1}</td>`;
+    table.forEach(snap => {
+      rows += `<td>${snap[f] !== '' ? snap[f] : '<span style="color:var(--border)">·</span>'}</td>`;
+    });
+    rows += `</tr>`;
+  }
+
+  // Status row
+  rows += `<tr><td class="row-header" style="color:var(--accent)">Status</td>`;
+  statusList.forEach(s => {
+    rows += `<td class="${s === 'Hit' ? 'cell-hit' : 'cell-miss'}">${s}</td>`;
+  });
+  rows += `</tr>`;
+
+  out.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr>${headers}</tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+// ── CLEAR HELPERS ─────────────────────────────────────────────────
+function clearPanel(name) {
+  const empties = {
+    paging: '<div class="empty"><span class="empty-icon">📄</span>Enter memory and page size, then click Simulate.</div>',
+    segmentation: '<div class="empty"><span class="empty-icon">🔍</span>Enter memory size, then click Simulate.</div>',
+    virtual: '<div class="empty"><span class="empty-icon">🔄</span>Enter memory and page size, then click Simulate.</div>',
+  };
+  document.getElementById(name === 'paging' ? 'paging-out' : name === 'segmentation' ? 'seg-out' : 'vm-out').innerHTML = empties[name];
+}
+function clearAlgo(name) {
+  const empties = {
+    fifo: '<div class="empty"><span class="empty-icon">🕒</span>Generate or enter a reference string, then click Run FIFO.</div>',
+    lru:  '<div class="empty"><span class="empty-icon">📉</span>Generate or enter a reference string, then click Run LRU.</div>',
+  };
+  document.getElementById(name + '-out').innerHTML = empties[name];
+  document.getElementById(name + '-stats').innerHTML = '';
+}
+</script>
+</body>
+</html>
